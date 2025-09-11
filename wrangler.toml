@@ -1,0 +1,4 @@
+name = "ZZJ网站监测"
+compatibility_date = "2025-09-03"  # 使用当前日期或最新兼容日期
+compatibility_flags = ["nodejs_compat"]
+pages_build_output_dir = "dist"  # 根据实际构建输出目录调整
