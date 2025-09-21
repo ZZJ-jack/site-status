@@ -1,8 +1,9 @@
-// https://uptimerobot.com/api/#methods
+// https://uptimerobot.com/api/#v3-getMonitors
 import dayjs from "dayjs";
 import type { MonitorsDataResult, MonitorsResult } from "~~/types/main";
 import { getCache, setCache } from "~/utils/cache-server";
 import { formatSiteData } from "~/utils/format";
+import { verifyJwt } from "../utils/jwt"; // 补充导入
 
 const getRanges = ():
   | {
@@ -19,7 +20,7 @@ const getRanges = ():
     const today = dayjs(new Date().setHours(0, 0, 0, 0));
     // 生成日期范围数组
     for (let d = 0; d < days; d++) dates.push(today.subtract(d, "day"));
-    // 生成自定义历史数据范围
+    // 生成自定义历史数据范围（v3 API格式兼容）
     const ranges = dates.map(
       (date) => `${date.unix()}_${date.add(1, "day").unix()}`,
     );
@@ -34,7 +35,7 @@ const getRanges = ():
 };
 
 /**
- * 获取站点数据
+ * 获取站点数据（适配API v3）
  */
 export default defineEventHandler(async (event): Promise<MonitorsResult> => {
   try {
@@ -43,16 +44,15 @@ export default defineEventHandler(async (event): Promise<MonitorsResult> => {
     if (!apiUrl || !apiKey) {
       throw new Error("Missing API url or API key");
     }
-    // 若登录-验证 token
+    // 若需登录-验证token
     if (sitePassword && siteSecretKey) {
       const token = getCookie(event, "authToken");
       if (!token) throw new Error("Please log in first");
-      // 验证 Token
       const isLogin = await verifyJwt(token);
       if (!isLogin) throw new Error("Invalid or expired token");
     }
     // 缓存键
-    const cacheKey = "site-data";
+    const cacheKey = "site-data-v3"; // 区分v3缓存
     // 检查缓存
     const cachedData = getCache(cacheKey);
     if (cachedData) {
@@ -64,31 +64,28 @@ export default defineEventHandler(async (event): Promise<MonitorsResult> => {
       };
     }
     const rangesData = getRanges();
-    if (!rangesData) throw new Error("Missing");
+    if (!rangesData) throw new Error("Failed to generate date ranges");
     const { dates, ranges, start, end } = rangesData;
-    // 构造请求体
-    const body = {
-      // API key
-      api_key: apiKey,
-      // json
+    // API v3参数（GET方法，query参数）
+    const queryParams = new URLSearchParams({
       format: "json",
-      // 显示日志
-      logs: 1,
-      // 日志类型
-      log_types: "1-2",
-      // 日期范围
-      logs_start_date: start,
-      logs_end_date: end,
+      logs: "1", // 返回日志
+      log_types: "1-2", // 日志类型
+      logs_start_date: start.toString(),
+      logs_end_date: end.toString(),
       custom_uptime_ranges: ranges,
-    };
-    // 尝试获取
-    const result = await $fetch(apiUrl + "getMonitors", {
-      method: "POST",
-      body,
     });
-    // 处理数据
+    // 调用v3 API（使用GET和Header认证）
+    const result = await $fetch(`${apiUrl}getMonitors?${queryParams.toString()}`, {
+      method: "GET",
+      headers: {
+        "X-Api-Key": apiKey, // v3 API使用Header传递密钥
+        "Content-Type": "application/json",
+      },
+    });
+    // 处理v3 API响应（需根据实际响应结构调整formatSiteData）
     const data = formatSiteData(result, dates);
-    // 缓存数据
+    // 缓存数据（1分钟）
     setCache(cacheKey, data, 1000 * 60);
     return {
       code: 200,
