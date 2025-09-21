@@ -89,8 +89,8 @@ export default defineNuxtConfig({
   css: ["~/style/main.scss", "~/style/animate.scss"],
   // env
   runtimeConfig: {
-    apiUrl: process.env.API_URL || "https://api.uptimerobot.com/v3/",
-    apiKey: process.env.API_KEY,
+    apiUrl: "https://api.uptimerobot.com/v3/", //process.env.API_URL
+    apiKey: "ur2924703-5ed6f7aeb8e8cdc79807b1fe", //process.env.API_KEY
     sitePassword: process.env.SITE_PASSWORD,
     siteSecretKey: process.env.SITE_SECRE_KEY || "site-status",
     public: siteConfig,
